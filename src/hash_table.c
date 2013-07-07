@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
-#define INITIAL_CAPACITY 8
+#define INITIAL_CAPACITY 4
 
 static size_t
 hash(const char* str)
@@ -26,6 +27,7 @@ append_entry(HashTableEntry** entries, size_t index, HashTableEntry* new_entry)
     HashTableEntry* p;
 
     assert(entries != NULL);
+    assert(new_entry != NULL);
     new_entry->next = NULL;
     if (entries[index]) {
         for (p = entries[index]; p->next; p = p->next) {}
@@ -41,6 +43,7 @@ extend_hash_table(HashTable* hash_table)
     HashTableEntry** old_entries;
     HashTableEntry** new_entries;
     HashTableEntry* entry;
+    HashTableEntry* next;
     size_t old_capacity;
     size_t new_capacity;
     size_t new_index;
@@ -49,14 +52,12 @@ extend_hash_table(HashTable* hash_table)
     old_entries = hash_table->entries;
     old_capacity = hash_table->capacity;
     new_capacity = old_capacity * 2;
-    new_entries = (HashTableEntry**)calloc(new_capacity, sizeof(HashTableEntry));
+    new_entries = (HashTableEntry**)calloc(new_capacity, sizeof(HashTableEntry*));
 
     for (i = 0; i < old_capacity; ++i) {
-        if (!old_entries[i])
-            continue;
-
-        for (entry = old_entries[i]; entry; entry = entry->next) {
+        for (entry = old_entries[i]; entry; entry = next) {
             new_index = hash_to_index(hash(entry->key), new_capacity);
+            next = entry->next;
             append_entry(new_entries, new_index, entry);
         }
     }
@@ -117,7 +118,7 @@ HashTable_get(const HashTable* hash_table, const char* key)
     size_t index;
     HashTableEntry* p;
 
-    index  = hash_to_index(hash(key), hash_table->capacity);
+    index = hash_to_index(hash(key), hash_table->capacity);
     for (p = hash_table->entries[index]; p; p = p->next) {
         if (strcmp(p->key, key) == 0)
             return p->value;
@@ -131,7 +132,7 @@ HashTable_set(HashTable* hash_table, const char* key, void* value)
     size_t index;
     HashTableEntry* p;
 
-    index  = hash_to_index(hash(key), hash_table->capacity);
+    index = hash_to_index(hash(key), hash_table->capacity);
     for (p = hash_table->entries[index]; p; p = p->next) {
         if (strcmp(p->key, key) == 0) {
             p->value = value;
@@ -139,8 +140,10 @@ HashTable_set(HashTable* hash_table, const char* key, void* value)
         }
     }
 
-    if (hash_table->size * 2 >= hash_table->capacity)
+    if (hash_table->size * 2 >= hash_table->capacity) {
         extend_hash_table(hash_table);
+        index = hash_to_index(hash(key), hash_table->capacity);
+    }
     p = (HashTableEntry*)calloc(1, sizeof(HashTableEntry));
     p->key = strdup(key);
     if (!p->key) {
